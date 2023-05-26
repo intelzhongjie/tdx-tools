@@ -17,6 +17,7 @@ COL_GUIDE=$COL_WHITE
 # Reference URLs
 #
 URL_TDX_LINUX_WHITE_PAPER=https://www.intel.com/content/www/us/en/content-details/779108/whitepaper-linux-stacks-for-intel-trust-domain-extension-1-0.html
+URL_TDX_CPU_EXTENSION=https://cdrdv2.intel.com/v1/dl/getContent/733582
 URL_INTEL_SDM=https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 
 #
@@ -83,7 +84,7 @@ check_cmd() {
 }
 
 #
-# Check the OS information
+# Check the OS information (mandatory).
 #
 check_os() {
     local action="Check OS: The distro and version are correct (manadory & manually)"
@@ -98,7 +99,7 @@ check_os() {
 }
 
 #
-# Check the TDX module's version
+# Check the TDX module's version (mandatory).
 #
 check_tdx_module() {
     local action="Check TDX Module: The version is expected (mandatory & manually)"
@@ -116,7 +117,7 @@ check_tdx_module() {
 }
 
 #
-# TDX only support 1LM mode
+# TDX only support 1LM mode (mandatory).
 #
 check_bios_memory_map() {
     local action="Check BIOS: Volatile Memory should be 1LM (mandatory & manually)"
@@ -130,7 +131,15 @@ check_bios_memory_map() {
 }
 
 #
-# Check whether the bit 11 for MSR 0x1401, 1 means MK-TME is enabled in BIOS.
+# Check if TME is enabled (mandatory).
+# Intel® 64 and IA-32 Architectures Software Developer Manuals (SDM):
+#   Vol. 4 Model Specific Registers (MSRs)
+#     Table 2-2. IA-32 Architectural MSRs (Contd.)
+#       Register Address: 982H
+#       Architectural MSR Name: IA32_TME_ACTIVATE
+#         Bit Fields: 1
+#         Bit Description: Hardware Encryption Enable. This bit also enables MKTME.
+#           MKTME cannot be enabled without enabling encryption hardware.
 #
 check_bios_enabling_mktme() {
     local action="Check BIOS: TME = Enabled (mandatory)"
@@ -145,13 +154,14 @@ check_bios_enabling_mktme() {
 }
 
 #
-# SDM:
+# Check if TME Bypass is enabled (optional).
+# Intel® 64 and IA-32 Architectures Software Developer Manuals (SDM):
 #   Vol. 4 Model Specific Registers (MSRs)
 #     Table 2-2. IA-32 Architectural MSRs (Contd.)
 #       Register Address: 982H
 #       Architectural MSR Name: IA32_TME_ACTIVATE
-#       Bit Fields: 31
-#       Bit Description: TME Encryption Bypass Enable
+#         Bit Fields: 31
+#         Bit Description: TME Encryption Bypass Enable
 #
 check_bios_tme_bypass() {
     local action="Check BIOS: TME Bypass = Enabled (optional)"
@@ -160,13 +170,14 @@ check_bios_tme_bypass() {
     retval=$(sudo rdmsr -f 31:31 0x982)
     [[ "$retval" == 1 ]] && result="OK" || result="FAIL"
     report_result "$result" "$action" "$reason" optional
+    print_guide "This is optional. Please reference the result for your requirement."
     print_guide "Details can be found in Intel SDM: Vol. 4 Model Specific Registers (MSRs)"
     print_url $URL_INTEL_SDM
     printf "\n"
 }
 
 #
-# Check TME-MT setting in BIOS
+# Check TME-MT setting in BIOS (mandatory).
 #
 check_bios_tme_mt() {
     local action="Check BIOS: TME-MT (mandatory & manually)"
@@ -180,7 +191,14 @@ check_bios_tme_mt() {
 }
 
 #
-# Check whether the bit 11 for MSR 0x1401, 1 means TDX is enabled in BIOS.
+# Check whether the bit 11 for MSR 0x1401 (mandatory). 1 means TDX is enabled in BIOS.
+# Intel® Trust Domain CPU Architectural Extensions
+#   1.2 INTEL® TDX MODULE AND INTEL P-SEAMLDR MODULE
+#     Table 1-1. IA32_SEAMRR_PHYS_BASE MSR and IA32_SEAMRR_PHYS_MASK MSR Layout (Continued)
+#       Register Address: 1401H
+#       Register Name: IA32_SEAMRR_PHYS_MASK
+#         Bit Fields: 11
+#         Bit Description: Enable bit for the SEAMRR (SEAM range register)
 #
 check_bios_enabling_tdx() {
     local action="Check BIOS: TDX = Enabled (mandatory)"
@@ -189,24 +207,35 @@ check_bios_enabling_tdx() {
     retval=$(sudo rdmsr -f 11:11 0x1401)
     [[ "$retval" == 1 ]] && result="OK" || result="FAIL"
     report_result "$result" "$action" "$reason" mandatory
+    print_guide "Details can be found in Intel® Trust Domain CPU Architectural Extensions"
+    print_url $URL_TDX_CPU_EXTENSION
     printf "\n"
 }
 
 #
-# Check if the SEAM Loader (TDX Arbitration Mode Loader) is enabled.
+# Check if the SEAM Loader (TDX Arbitration Mode Loader) is enabled (optional).
 #
 check_bios_seam_loader() {
     local action="Check BIOS: SEAM Loader = Enabled (optional)"
     local reason=""
     report_result TBD "$action" "$reason" optional manual
+    print_guide "This is optional. Please reference the result for your requirement."
     print_guide "Details can be found in Whitepaper: Linux* Stacks for Intel® Trust Domain Extensio, Chapter 6.1 Override the Intel TDX SEAM module"
     print_url $URL_TDX_LINUX_WHITE_PAPER
     printf "\n"
 }
 
 #
-# IA32_TME_CAPABILITY
-# MK_TME_MAX_KEYS
+# Check if TDX Key Split is non-zero (mandatory).
+# Intel® 64 and IA-32 Architectures Software Developer Manuals (SDM):
+#   Vol. 4 Model Specific Registers (MSRs)
+#     Table 2-2. IA-32 Architectural MSRs (Contd.)
+#       Register Address: 981H
+#       Architectural MSR Name: IA32_TME_CAPABILITY
+#         Bit Fields: 50:36
+#         Bit Description: MK_TME_MAX_KEYS Indicates the maximum number of keys
+#           which are available for usage. This value may not be a power of 2.
+#           KeyID 0 is specially reserved and is not accounted for in this field.
 #
 check_bios_tdx_key_split() {
     local action="Check BIOS: TDX Key Split != 0 (mandatory)"
@@ -215,12 +244,21 @@ check_bios_tdx_key_split() {
     retval=$(sudo rdmsr -f 50:36 0x981)
     [[ "$retval" != 0 ]] && result="OK" || result="FAIL"
     report_result "$result" "$action" "$reason" mandatory
+    print_guide "Details can be found in Intel SDM: Vol. 4 Model Specific Registers (MSRs)"
+    print_url $URL_INTEL_SDM
     printf "\n"
 }
 
 #
-# Check whether SGX is enabled in BIOS
+# Check whether SGX is enabled in BIOS (mandatory)
 # NOTE: please refer https://software.intel.com/sites/default/files/managed/48/88/329298-002.pdf
+# Or reference Intel® 64 and IA-32 Architectures Software Developer Manuals (SDM):
+#   Vol. 4 Model Specific Registers (MSRs)
+#     Table 2-2. IA-32 Architectural MSRs (Contd.)
+#       Register Address: 3AH
+#       Architectural MSR Name: IA32_FEATURE_CONTROL
+#         Bit Fields: 18
+#         Bit Description: SGX Global Enable (R/WL). This bit must be set to enable SGX leaf functions.
 #
 check_bios_enabling_sgx() {
     local action="Check BIOS: SGX = Enabled (mandatory)"
@@ -229,10 +267,14 @@ check_bios_enabling_sgx() {
     retval=$(sudo rdmsr -f 18:18 0x3a)
     [[ $retval == 1 ]] && result="OK" || result="FAIL"
     report_result "$result" "$action" "$reason" mandatory
+    print_guide "Details can be found in Intel SDM: Vol. 4 Model Specific Registers (MSRs)"
+    print_url $URL_INTEL_SDM
     printf "\n"
 }
 
-
+#
+# Check whether SGX registration server is as requirement (mandatory).
+#
 check_bios_sgx_reg_server() {
     local action="Check BIOS: SGX registration server (mandatory & manually)"
     local reason=""
