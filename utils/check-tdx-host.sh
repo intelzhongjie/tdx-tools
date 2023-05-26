@@ -3,21 +3,13 @@
 # Check the TDX host status
 #
 
-COL_BLACK=$(tput setaf 0)
+
 COL_RED=$(tput setaf 1)
 COL_GREEN=$(tput setaf 2)
 COL_YELLOW=$(tput setaf 3)
-COL_LIME_YELLOW=$(tput setaf 190)
-COL_POWDER_BLUE=$(tput setaf 153)
 COL_BLUE=$(tput setaf 4)
-COL_MAGENTA=$(tput setaf 5)
-COL_CYAN=$(tput setaf 6)
 COL_WHITE=$(tput setaf 7)
-COL_BRIGHT=$(tput bold)
 COL_NORMAL=$(tput sgr0)
-COL_BLINK=$(tput blink)
-COL_REVERSE=$(tput smso)
-COL_UNDERLINE=$(tput smul)
 COL_URL=$COL_BLUE
 COL_GUIDE=$COL_WHITE
 
@@ -25,7 +17,6 @@ COL_GUIDE=$COL_WHITE
 # Reference URLs
 #
 URL_TDX_LINUX_WHITE_PAPER=https://www.intel.com/content/www/us/en/content-details/779108/whitepaper-linux-stacks-for-intel-trust-domain-extension-1-0.html
-URL_TDX_GENERAL_INFO=https://www.intel.com/content/www/us/en/developer/articles/technical/intel-trust-domain-extensions.html
 URL_INTEL_SDM=https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 
 #
@@ -72,7 +63,7 @@ report_result() {
 	    reason="Unable to check in program. Please check manually."
 	fi
         printf '%.70s %s\n' "${action} ........................................" "${text_color}${result}${COL_NORMAL}"
-        if [[ ! -z $reason ]]; then
+        if [[ -n $reason ]]; then
             printf "    ${text_color}Reason: %s\n${COL_NORMAL}" "$reason"
         fi
     fi
@@ -84,61 +75,58 @@ report_result() {
 #   $1  -   the command or program
 #
 check_cmd() {
-    if ! [ -x "$(command -v $1)" ]; then
-        echo "Error: $1 is not installed." >&2
-        echo $2
+    if ! [ -x "$(command -v "$1")" ]; then
+        echo "Error: \"$1\" is not installed." >&2
+        echo "$2"
         exit 1
     fi
 }
 
-check_board() {
-    local action="Check board: The board info are correct (manadory & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" mandatory manual
-    local board_info=$(sudo dmidecode | grep "Base Board Information" -A2)
-    print_guide "Your board info." $board_info
-    print_guide "Details can be found in Whitepaper: Linux* Stacks for Intel® Trust Domain Extenson"
-    print_url $URL_TDX_LINUX_WHITE_PAPER
-}
-
+#
+# Check the OS information
+#
 check_os() {
     local action="Check OS: The distro and version are correct (manadory & manually)"
     local reason=""
     report_result TBD "$action" "$reason" mandatory manual
-    local os_info=$(head -2 /etc/os-release)
-    print_guide "Your OS info." $os_info
+    local os_info
+    os_info=$(head -2 /etc/os-release)
+    print_guide "Your OS info." "$os_info"
     print_guide "Details can be found in Whitepaper: Linux* Stacks for Intel® Trust Domain Extenson"
     print_url $URL_TDX_LINUX_WHITE_PAPER
+    printf "\n"
 }
 
+#
+# Check the TDX module's version
+#
 check_tdx_module() {
     local action="Check TDX Module: The version is expected (mandatory & manually)"
     local reason=""
     report_result TBD "$action" "$reason" mandatory manual
-    local tdx_module_info=$(ls /sys/firmware/tdx/tdx_module | while read tdxattr; \
-            do echo $tdxattr: ; cat /sys/firmware/tdx/tdx_module/$tdxattr; echo; done)
+    local tdx_module_info
+    # shellcheck disable=SC2012
+    tdx_module_info=$(ls /sys/firmware/tdx/tdx_module | while read -r tdxattr; \
+            do echo "$tdxattr": ; cat /sys/firmware/tdx/tdx_module/"$tdxattr"; echo; done)
+    # shellcheck disable=SC2086
     print_guide "Your TDX Module info." $tdx_module_info
     print_guide "Details can be found in Whitepaper: Linux* Stacks for Intel® Trust Domain Extenson"
     print_url $URL_TDX_LINUX_WHITE_PAPER
+    printf "\n"
 }
 
+#
+# TDX only support 1LM mode
+#
 check_bios_memory_map() {
     local action="Check BIOS: Volatile Memory should be 1LM (mandatory & manually)"
     local reason=""
     report_result TBD "$action" "$reason" mandatory manual
     print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Memory Configuration -> Memory Map"
+    print_guide "    Socket Configuration -> Memory Configuration -> Memory Map"
     print_guide "        Volatile Memory (or Volatile Memory Mode) should be 1LM"
-}
-
-check_bios_memory_dfx() {
-    local action="Check BIOS: DDR5 Override Refresh Mode = All Bank Fine (optional & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" optional manual
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Memory Configuration"
-    print_guide "      -> Memory Dfx Configuration -> DDR5 Override Refresh Mode"
-    print_guide "         should be All Banck Fine"
+    print_guide "(Different BIOS may need different setting path)"
+    printf "\n"
 }
 
 #
@@ -147,11 +135,13 @@ check_bios_memory_dfx() {
 check_bios_enabling_mktme() {
     local action="Check BIOS: TME = Enabled (mandatory)"
     local reason="The bit 1 of MSR 0x982 should be 1"
-    local retval=$(sudo rdmsr -f 1:1 0x982)
-    [[ $retval == 1 ]] && result="OK" || result="FAIL"
-    report_result $result "$action" "$reason" mandatory
+    local retval
+    retval=$(sudo rdmsr -f 1:1 0x982)
+    [[ "$retval" == 1 ]] && result="OK" || result="FAIL"
+    report_result "$result" "$action" "$reason" mandatory
     print_guide "Details can be found in Intel SDM: Vol. 4 Model Specific Registers (MSRs)"
     print_url $URL_INTEL_SDM
+    printf "\n"
 }
 
 #
@@ -166,29 +156,27 @@ check_bios_enabling_mktme() {
 check_bios_tme_bypass() {
     local action="Check BIOS: TME Bypass = Enabled (optional)"
     local reason="The bit 31 of MSR 0x982 should be 1"
-    local retval=$(sudo rdmsr -f 31:31 0x982)
-    [[ $retval == 1 ]] && result="OK" || result="FAIL"
-    report_result $result "$action" "$reason" optional
+    local retval
+    retval=$(sudo rdmsr -f 31:31 0x982)
+    [[ "$retval" == 1 ]] && result="OK" || result="FAIL"
+    report_result "$result" "$action" "$reason" optional
     print_guide "Details can be found in Intel SDM: Vol. 4 Model Specific Registers (MSRs)"
     print_url $URL_INTEL_SDM
+    printf "\n"
 }
 
+#
+# Check TME-MT setting in BIOS
+#
 check_bios_tme_mt() {
     local action="Check BIOS: TME-MT (mandatory & manually)"
     local reason=""
     report_result TBD "$action" "$reason" mandatory manual
     print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Processor Configuration -> TME, TME-MT, TDX"
+    print_guide "    Socket Configuration -> Processor Configuration -> TME, TME-MT, TDX"
     print_guide "        Total Memory Encryption Multi-Tenant (TME-MT) should be Enable"
-}
-
-check_bios_tme_integrity() {
-    local action="Check BIOS: TME Memory Integrity (mandatory & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" mandatory manual
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Processor Configuration -> TME, TME-MT, TDX"
-    print_guide "        Memory Integrity should be Disable"
+    print_guide "(Different BIOS may need different setting path)"
+    printf "\n"
 }
 
 #
@@ -197,9 +185,11 @@ check_bios_tme_integrity() {
 check_bios_enabling_tdx() {
     local action="Check BIOS: TDX = Enabled (mandatory)"
     local reason="The bit 11 of MSR 1401 should be 1"
-    local retval=$(sudo rdmsr -f 11:11 0x1401)
-    [[ $retval == 1 ]] && result="OK" || result="FAIL"
-    report_result $result "$action" "$reason" mandatory
+    local retval
+    retval=$(sudo rdmsr -f 11:11 0x1401)
+    [[ "$retval" == 1 ]] && result="OK" || result="FAIL"
+    report_result "$result" "$action" "$reason" mandatory
+    printf "\n"
 }
 
 #
@@ -211,6 +201,7 @@ check_bios_seam_loader() {
     report_result TBD "$action" "$reason" optional manual
     print_guide "Details can be found in Whitepaper: Linux* Stacks for Intel® Trust Domain Extensio, Chapter 6.1 Override the Intel TDX SEAM module"
     print_url $URL_TDX_LINUX_WHITE_PAPER
+    printf "\n"
 }
 
 #
@@ -220,18 +211,11 @@ check_bios_seam_loader() {
 check_bios_tdx_key_split() {
     local action="Check BIOS: TDX Key Split != 0 (mandatory)"
     local reason="TDX Key Split should be non-zero"
-    local retval=$(sudo rdmsr -f 50:36 0x981)
-    [[ $retval != 0 ]] && result="OK" || result="FAIL"
-    report_result $result "$action" "$reason" mandatory
-}
-
-check_bios_allow_sgx_nonpor() {
-    local action="Check BIOS: Allow SGX with non-POR (optional & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" optional manual
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Processor Configuration -> Processor Dfx Configuration"
-    print_guide "        Allow SGX with non-POR memory population could be Enable"
+    local retval
+    retval=$(sudo rdmsr -f 50:36 0x981)
+    [[ "$retval" != 0 ]] && result="OK" || result="FAIL"
+    report_result "$result" "$action" "$reason" mandatory
+    printf "\n"
 }
 
 #
@@ -241,19 +225,13 @@ check_bios_allow_sgx_nonpor() {
 check_bios_enabling_sgx() {
     local action="Check BIOS: SGX = Enabled (mandatory)"
     local reason="The bit 18 of MSR 0x3a should be 1"
-    local retval=$(sudo rdmsr -f 18:18 0x3a)
+    local retval
+    retval=$(sudo rdmsr -f 18:18 0x3a)
     [[ $retval == 1 ]] && result="OK" || result="FAIL"
-    report_result $result "$action" "$reason" mandatory
+    report_result "$result" "$action" "$reason" mandatory
+    printf "\n"
 }
 
-check_bios_excl_mem_cmr() {
-    local action="Check BIOS: Disable excluding Mem below 1MB in CMR Enable(D0)/Disable(E0) (mandatory & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" mandatory manual
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Processor Configuration"
-    print_guide "        Disable excluding Mem below 1MB in CMR should be Enable(D0)/Disable(E0)"
-}
 
 check_bios_sgx_reg_server() {
     local action="Check BIOS: SGX registration server (mandatory & manually)"
@@ -261,42 +239,25 @@ check_bios_sgx_reg_server() {
     report_result TBD "$action" "$reason" mandatory manual
     retval=$(sudo rdmsr -f 27:27 0xce)
     [[ $retval == 1 ]] && sgx_reg_srv="SBX" || sgx_reg_srv="LIV"
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII MENU -> Socket Configuration -> Processor Configuration -> Processor Dfx Configuration"
-    print_guide "        SGX registration server should be" $sgx_reg_srv
-}
-
-check_bios_delayed_authen() {
-    local action="Check BIOS: For attestation, Delayed Authentication (mandatory & manually)"
-    local reason=""
-    report_result TBD "$action" "$reason" mandatory manual
-    print_guide "Please check your BIOS settings:"
-    print_guide "    EDKII Menu -> Platform Configuration -> Server ME Debug Configuration -> Server ME General Configuration"
-    print_guide "        Delayed Authentication should be (X)"
-    print_guide "        Delayed Authentication Mode (DAM) should be Disabled"
+    print_guide "SGX registration server is $sgx_reg_srv"
+    printf "\n"
 }
 
 print_title "TDX Host Check"
 
 check_cmd rdmsr "Please install via apt install msr-tool (Ubuntu) or dnf install msr-tools (RHEL/CentOS)"
 
-check_board
 check_os
 check_tdx_module
 check_bios_memory_map
-check_bios_memory_dfx
 check_bios_enabling_mktme
 check_bios_tme_bypass
 check_bios_tme_mt
-check_bios_tme_integrity
 check_bios_enabling_tdx
 check_bios_seam_loader
 check_bios_tdx_key_split
-check_bios_allow_sgx_nonpor
 check_bios_enabling_sgx
-check_bios_excl_mem_cmr
 check_bios_sgx_reg_server
-check_bios_delayed_authen
 
 print_guide ""
 print_guide ""
