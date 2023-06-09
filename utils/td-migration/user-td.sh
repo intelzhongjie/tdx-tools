@@ -128,7 +128,8 @@ QEMU_CMD="${QEMU_EXEC} \
 -cpu host,pmu=off,-kvm-steal-time,-shstk,tsc-freq=1000000000 \
 -smp 2,threads=1,sockets=1 \
 -m 8G \
--object memory-backend-memfd-private,id=ram1,size=8G \
+-object memory-backend-memfd,id=devshm,size=8G \
+-object memory-backend-memfd-private,id=ram1,size=8G,path=/dev/shm,shmemdev=devshm \
 -machine q35,memory-backend=ram1,confidential-guest-support=tdx0,kernel_irqchip=split \
 -bios ${OVMF} \
 -chardev stdio,id=mux,mux=on,logfile=lm-${TD_TYPE}.log \
