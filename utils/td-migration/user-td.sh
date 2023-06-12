@@ -79,13 +79,15 @@ process_args() {
         error "Must set TD_TYPE -t [src|dst]"
     fi
 
-    local cpu_num_valid=$(is_positive_int ${CPU_NUM})
+    local cpu_num_valid
+    cpu_num_valid=$(is_positive_int "${CPU_NUM}")
     if [[ $cpu_num_valid != true ]]; then
         usage
 	error "CPU number should be positive integer"
     fi
 
-    local mem_size_valid=$(is_positive_int ${MEM_SIZE})
+    local mem_size_valid
+    mem_size_valid=$(is_positive_int "${MEM_SIZE}")
     if [[ $mem_size_valid != true ]]; then
         usage
 	error "Memory size should be positive integer"
