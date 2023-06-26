@@ -3,21 +3,30 @@ set -e
 
 TYPE="local"
 DEST_IP=""
+TCP_PORT=9009
+VSOCK_PORT_A=1235
+VSOCK_PORT_B=1234
 
 usage() {
     cat << EOM
 Usage: $(basename "$0") [OPTION]...
   -i <dest ip>              Destination platform ip address
   -t <local|remote>         Use single or cross host live migration
+  -p <tcp port>             TCP port
+  -a <vsock port A>         VSOCK port A
+  -b <vsock port B>         VSOCK port B
   -h                        Show this help
 EOM
 }
 
 process_args() {
-    while getopts "i:t:h" option; do
+    while getopts "i:t:p:a:b:h" option; do
         case "${option}" in
             i) DEST_IP=$OPTARG;;
             t) TYPE=$OPTARG;;
+            p) TCP_PORT=$OPTARG;;
+            a) VSOCK_PORT_A=$OPTARG;;
+            b) VSOCK_PORT_B=$OPTARG;;
             h) usage
                exit 0
                ;;
@@ -50,13 +59,13 @@ error() {
 connect() {
     modprobe vhost_vsock
     if [[ ${TYPE} == "local" ]]; then
-        socat TCP4-LISTEN:9009,reuseaddr VSOCK-LISTEN:1235,fork &
+        socat TCP4-LISTEN:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_A},fork &
         sleep 3
-        socat TCP4-CONNECT:127.0.0.1:9009,reuseaddr VSOCK-LISTEN:1234,fork &
+        socat TCP4-CONNECT:127.0.0.1:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_B},fork &
     else
-        ssh root@"${DEST_IP}" -o ConnectTimeout=30 "modprobe vhost_vsock; nohup socat TCP4-LISTEN:9009,reuseaddr VSOCK-LISTEN:1235,fork > foo.out 2> foo.err < /dev/null &"
+        ssh root@"${DEST_IP}" -o ConnectTimeout=30 "modprobe vhost_vsock; nohup socat TCP4-LISTEN:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_A},fork > foo.out 2> foo.err < /dev/null &"
         sleep 3
-        socat TCP4-CONNECT:"${DEST_IP}":9009,reuseaddr VSOCK-LISTEN:1234,fork &
+        socat TCP4-CONNECT:"${DEST_IP}":${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_B},fork &
     fi
 }
 
