@@ -59,13 +59,13 @@ error() {
 connect() {
     modprobe vhost_vsock
     if [[ ${TYPE} == "local" ]]; then
-        socat TCP4-LISTEN:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_DST},fork &
+        socat TCP4-LISTEN:"${TCP_PORT}",reuseaddr VSOCK-LISTEN:"${VSOCK_PORT_DST}",fork &
         sleep 3
-        socat TCP4-CONNECT:127.0.0.1:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_SRC},fork &
+        socat TCP4-CONNECT:127.0.0.1:"${TCP_PORT}",reuseaddr VSOCK-LISTEN:"${VSOCK_PORT_SRC}",fork &
     else
         ssh root@"${DEST_IP}" -o ConnectTimeout=30 "modprobe vhost_vsock; nohup socat TCP4-LISTEN:${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_DST},fork > foo.out 2> foo.err < /dev/null &"
         sleep 3
-        socat TCP4-CONNECT:"${DEST_IP}":${TCP_PORT},reuseaddr VSOCK-LISTEN:${VSOCK_PORT_SRC},fork &
+        socat TCP4-CONNECT:"${DEST_IP}":"${TCP_PORT}",reuseaddr VSOCK-LISTEN:"${VSOCK_PORT_SRC}",fork &
     fi
 }
 

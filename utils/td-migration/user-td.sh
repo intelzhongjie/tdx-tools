@@ -116,7 +116,7 @@ process_args() {
     fi
 
     if [[ -z $MAC_ADDR ]]; then
-        MAC_ADDR=$(printf '00:60:2f:%02x:%02x:%02x\n' $[RANDOM%256] $[RANDOM%256] $[RANDOM%256])
+        MAC_ADDR=$(printf '00:60:2f:%02x:%02x:%02x\n' $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
     fi
 
     case ${TDX_ENABLE} in
