@@ -5,3 +5,4 @@ libvirt-python
 wheel
 docker
 py-libnuma
+py
