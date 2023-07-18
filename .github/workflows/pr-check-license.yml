@@ -23,7 +23,6 @@ jobs:
           python3 -m pip list
           python3 -m pip install liccheck
           python3 -m pip install --upgrade pip
-          apt-get install libvirt-dev
           python3 -m pip list
           for f in $(find -type f -name "requirements.txt"); do
             cat $f | while read pymodule; do
