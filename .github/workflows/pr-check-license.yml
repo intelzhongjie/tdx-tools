@@ -25,5 +25,8 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip list
           for f in $(find -type f -name "requirements.txt"); do
+            cat $f | while read pymodule; do
+              echo python3 -m pip install $pymodule
+            done
             liccheck -s .github/.license_check.ini -r $f
           done
